@@ -27,7 +27,7 @@ from collections import deque
 # 點 即是 樣本點，為最小的時間單位
 #
 # 點、秒 可透過 sample_rate 來設定
-# 每秒點數 即為 sample_rate， 
+# point_per_sec 即為 sample_rate， 
 # 習慣上可設為 44100, 16000
 #
 # 在此：
@@ -40,7 +40,7 @@ class RyMic:
     
         self.audio=  pyaudio.PyAudio()
         self.musicfile = musicfile
-        self.sample_rate= self.每秒點數=  sample_rate #16000 # 10240 #10000
+        self.sample_rate= self.point_per_sec=  sample_rate #16000 # 10240 #10000
         self.frame_size=            frame_size #1024  # 1000
         self.byte_per_point= byte_per_point= 2
 
@@ -51,7 +51,7 @@ class RyMic:
                                         byte_per_point, 
                                         unsigned= 'False'), #8,
                     
-                    frames_per_buffer= self.frame_size, #1000,
+                    frames_per_buffer= self.frame_size, 
                     
                     input= True, 
                     output=True
@@ -63,12 +63,12 @@ class RyMic:
         
         '''         
         self.秒數= 秒數 #1
-        self.點數= self.秒數 * self.每秒點數
+        self.點數= self.秒數 * self.point_per_sec
         self.框數= self.點數 // self.frame_size 
         '''
         self.框數= 框數
         self.點數= self.框數 * self.frame_size
-        self.秒數= self.點數 / self.每秒點數 # 秒數非整數，在此預設值計算為 1.024
+        self.秒數= self.點數 / self.point_per_sec # 秒數非整數，在此預設值計算為 1.024
         
         # 由於這裡會無條件捨去小數點，
         # 故實際秒數會變小一點。 
@@ -80,13 +80,13 @@ class RyMic:
         #
         # 用多線程
         #
-        self.錄音線=  threading.Thread(target= self.錄音線程 )
+        self.record=  threading.Thread(target= self.record_thread )
         self.放音線=  threading.Thread(target= self.放音線程 )       
         self.初框線=  threading.Thread(target= self.初框線程)
         self.wav初框線=  threading.Thread(target= self.初框線程,kwargs={'source':'wav'})
         
         #
-        # 加入 wav 擋 當作 麥 來用，可同時使用。
+        # 加入 wav 檔 當作 麥 來用，可同時使用。
         #
         
         self.wav錄放音線=  threading.Thread(target= self.wav錄放音線程)
@@ -100,24 +100,26 @@ class RyMic:
         
         '''         
         self.秒數= 秒數 #1
-        self.點數= self.秒數 * self.每秒點數
+        self.點數= self.秒數 * self.point_per_sec
         self.框數= self.點數 // self.frame_size 
         '''
         self.wav框數= self.框數
         self.wav點數= self.框數 * self.frame_size
-        self.wav秒數= self.點數 / self.每秒點數 # 秒數非整數，在此預設值計算為 1.024
+        self.wav秒數= self.點數 / self.point_per_sec # 秒數非整數，在此預設值計算為 1.024
 
-    def 錄音線程(self):
+    def record_thread(self):
+        '''
+        讀檔並以每個frame_size大小放入 框們 且 i框++
+        框們為queue
+        '''
     
-        #global 框們, 錄音線程活著
-        #
         # 最初 決定 框數= 10，frame_size= 1000， frame_size應小於 y.get_read_available()
         #
         #
         #框數     = 10
-        #frame_size = 1000
+        #frame_size = 1024
         #
-        print('錄音線程()....')
+        print('record_thread()....')
         
         self.i框= 0
         self.框們=  deque() #[]
@@ -136,8 +138,8 @@ class RyMic:
         #
         
  
-        self.錄音線程活著= True
-        while self.錄音線程活著: #True:
+        self.record_thread_is_alive= True
+        while self.record_thread_is_alive: #True:
             
             z= self.音流.read(self.frame_size)
             
@@ -167,24 +169,11 @@ class RyMic:
         錄音從最右邊進來
         到達最左邊才放音
         '''
-        
-    def 結束錄放音線程(self):
-
-
-        self.錄音線程活著= False
-        self.放音線程活著= False
-        self.wav錄音線程活著= False
-        
-        time.sleep(.1) # 等一下，讓錄放音線程停車
-        
-        
-        self.音流.close()
-        self.audio.terminate()
 
 
     def start(self, 錄= True, 放= False, 初= True, wav= True):
 
-        if 錄:   self.錄音線.start()
+        if 錄:   self.record.start()
         if 放:   self.放音線.start()
         if 初:   
             self.初框線.start()
@@ -193,7 +182,18 @@ class RyMic:
         if wav:  self.wav錄放音線.start()
 
     def stop(self):
-        self.結束錄放音線程()
+        '''
+        結束錄放音線程
+        '''
+        self.record_thread_is_alive= False
+        self.放音線程活著= False
+        self.wav_record_thread_is_alive= False
+        
+        time.sleep(.1) # 等一下，讓錄放音線程停車
+        
+        
+        self.音流.close()
+        self.audio.terminate()
     
        
     def 初框線程(self, source= 'mic'):
@@ -229,10 +229,14 @@ class RyMic:
             X= np.fft.fft(x[(0+i*N):(N+i*N)])
             X= abs(X)
             X= X[0:N//2]
-     
-            平均頻率 += (k*X).sum()/X.sum() #* sample_rate/frame_size
             
-            平均平方頻率 += (k*k*X).sum()/X.sum() #* (sample_rate/frame_size)**2
+            #防止X.sum()==0 但不知會不會影響其他地方
+            if X.sum() == 0:
+                continue
+            else:   
+                平均頻率 += (k*X).sum()/X.sum() 
+                
+                平均平方頻率 += (k*k*X).sum()/X.sum() 
         
         平均頻率 /= self.框數
         平均平方頻率 /= self.框數
@@ -263,11 +267,11 @@ class RyMic:
         
         p= self.audio
         音檔名 = self.musicfile
-        self.wav錄音線程活著= True
+        self.wav_record_thread_is_alive= True
         
         self.wav_i框= 0 
         self.wav框們=  deque() #[]
-        while self.wav錄音線程活著:
+        while self.wav_record_thread_is_alive:
         
             self.音檔名 = 音檔名
             
@@ -288,8 +292,8 @@ class RyMic:
                                            
                 self.wav_i框= 0 #self.i框 #0 # 用 來同步，起初同步，運作過程未知。待研究！！
                 
-                self.wav錄音線程活著= True
-                while self.wav錄音線程活著: #True:
+                self.wav_record_thread_is_alive= True
+                while self.wav_record_thread_is_alive: #True:
                     
                     z= f.readframes(self.frame_size)
                     
@@ -347,13 +351,13 @@ class RyMic:
                     
                     while len(self.wav框們) > self.wav框數:
                         self.wav框們.popleft()#pop(0)  # 舊框彈出
-                self.wav錄音線程活著= False
+                self.wav_record_thread_is_alive= False
                 self.w音流.stop_stream()
                 self.w音流.close()
                         
 
 if __name__=='__main__':        
-    x= RyMic()
+    x= RyMic(musicfile = 'output/tmp/KaraOKE.wav')
     x.start()
     print('ryEnjoy.....! 記得　x.stop()')
      

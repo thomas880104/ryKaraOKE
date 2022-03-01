@@ -54,12 +54,12 @@ class MainWindow(QMainWindow):
         self.inputlineEdit.setFont(font)
         self.inputlineEdit.setObjectName("inputlineEdit")
 
-        pybutton = QPushButton('noSplit', self)
-        pybutton.clicked.connect(self.noSplit)
+        pybutton = QPushButton('onvocal', self)
+        pybutton.clicked.connect(self.onvocal)
         pybutton.setGeometry(QRect(110, 200, 75, 23))
         pybutton.setObjectName("inputcheck")
 
-        pybutton = QPushButton('OK', self)
+        pybutton = QPushButton('offvocal', self)
         pybutton.clicked.connect(self.clickMethod)
         pybutton.setGeometry(QRect(190, 200, 75, 23))
         pybutton.setObjectName("inputcheck")
@@ -74,12 +74,13 @@ class MainWindow(QMainWindow):
         self.ErrorLabel.setStyleSheet("color: red;")
         self.ErrorLabel.setText('這個連結是無效的，請重新輸入')
 
-    def noSplit(self):
+    def onvocal(self):
         URL = self.inputlineEdit.text()
         try:
             Downloading_music(URL)
             self.ErrorLabel.setStyleSheet("color: black;")
             self.ErrorLabel.setText('請稍等...')
+            myspleeterrun()
             os.system("mv tmp.wav output/tmp/KaraOKE.wav")
             self.allo = True
             self.close()
