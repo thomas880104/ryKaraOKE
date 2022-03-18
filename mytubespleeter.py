@@ -1,7 +1,15 @@
-
+'''
+2022/3/8
+修改Downloading_music,myspleeterrun內容
+可將下載過的音樂存入NoNetSongs資料夾
+2022/3/11
+修正onvocal，Downloading_music功能
+2022/3/15
+增加folder selecter for local file
+'''
 from pytube import YouTube
 import ffmpeg
-import shlex, subprocess,os
+import shlex, subprocess,os,shutil,time
 from pydub import AudioSegment 
 
 
@@ -17,6 +25,10 @@ def Splitting_stereo_audio(file):
     return channel_1,channel_2
 
 def Downloading_music(link):
+    '''
+    input:youtube link
+    output:song title
+    '''
     song_there = os.path.isfile("tmp.wav")
     if song_there:
         try:
@@ -28,21 +40,32 @@ def Downloading_music(link):
             pass
     yt=YouTube(link)
     t=yt.streams.filter(only_audio=True, file_extension='mp4')
-    name= 'tmp.mp4'
-    t[0].download(filename=name)
-    video = ffmpeg.input("tmp.mp4")
+    v = t[0]
+    v.download(filename='tmp.mp4')
+    name= v.title
+    print(name+'.mp4')
+    video = ffmpeg.input('./tmp.mp4')
     audio = video.audio
     stream = ffmpeg.output(audio, "tmp.wav")
     ffmpeg.run(stream)
-def myspleeterrun():
+    shutil.move('tmp.mp4', './mp4/' + name + '.mp4')
+    return name
+def myspleeterrun(song_name = 'KaraOKE',mode = 'offvocal'):
     command_line = "spleeter separate -o output/ tmp.wav"
     args = shlex.split(command_line)
     p = subprocess.Popen(args)
     p.wait()  
-    accompaniment_channel_1,accompaniment_channel_2 =Splitting_stereo_audio(r'output\tmp\accompaniment.wav')
-    vocal_channel_1,vocal_channel_2 =Splitting_stereo_audio(r"output\tmp\vocals.wav")
+    if mode == 'offvocal':
+        accompaniment_channel_1,accompaniment_channel_2 = Splitting_stereo_audio(r'output\tmp\accompaniment.wav')
+    elif mode == 'onvocal':
+        accompaniment_channel_1,accompaniment_channel_2 = Splitting_stereo_audio('./tmp.wav')
+    vocal_channel_1,vocal_channel_2 = Splitting_stereo_audio(r"output\tmp\vocals.wav")
     mutli_channel = AudioSegment.from_mono_audiosegments(accompaniment_channel_1,accompaniment_channel_2,vocal_channel_1)
     mutli_channel.export(r"output\tmp\KaraOKE.wav",format="wav")
     sound = AudioSegment.from_file(r"output\tmp\KaraOKE.wav")
     sound = sound.set_frame_rate(16000)
     sound.export(r"output\tmp\KaraOKE.wav",format="wav")
+    shutil.copyfile('./output/tmp/KaraOKE.wav', './NoNetSongs/KaraOKE.wav')
+    print(song_name)
+    shutil.move('./NoNetSongs/KaraOKE.wav', './NoNetSongs/' + song_name + '.wav')
+    os.remove('./tmp.wav')

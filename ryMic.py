@@ -139,7 +139,7 @@ class RyMic:
         
  
         self.record_thread_is_alive= True
-        while self.record_thread_is_alive: #True:
+        while self.record_thread_is_alive: 
             
             z= self.音流.read(self.frame_size)
             
@@ -150,17 +150,23 @@ class RyMic:
         
         # 如此，框們[:] ==框們[0,...,(N-1)] == 框們[-N,...,-1]
 
-    def 等待第一圈錄音圓滿(self):
-        while (len(self.框們) < self.框數): time.sleep(.01)
-        return True
+    def 等待第一圈錄音圓滿(self, source = 'mic'):
+        if source == 'mic':
+            while (len(self.框們) < self.框數): 
+                time.sleep(.01)
+            return True
+        elif source == 'wav':
+            while (len(self.wav框們) < self.wav框數): 
+                time.sleep(.01)
+            return True
         
     def 放音線程(self):
         
         print('放音線程()....')
         self.等待第一圈錄音圓滿()
         
-        self.放音線程活著= True
-        while self.放音線程活著: #True:
+        self.play_thread_is_alive= True
+        while self.play_thread_is_alive: #True:
             z= self.框們[0] # [0..-1] # 錄音進 框們[-1] 之後，放音與其相距 (框數-1) 個框
             self.音流.write(z)
            
@@ -186,7 +192,7 @@ class RyMic:
         結束錄放音線程
         '''
         self.record_thread_is_alive= False
-        self.放音線程活著= False
+        self.play_thread_is_alive= False
         self.wav_record_thread_is_alive= False
         
         time.sleep(.1) # 等一下，讓錄放音線程停車
@@ -197,17 +203,18 @@ class RyMic:
     
        
     def 初框線程(self, source= 'mic'):
-        
+        '''
+        取 最初框、算振幅平均mean、振幅標準差std
+        '''
 
-        #取 最初框、算振幅平均mean、振幅標準差std
         
         print('{}, source= {}\n'.format('初框線程()....', source))
         
         if source == 'mic':
-            self.等待第一圈錄音圓滿()
+            self.等待第一圈錄音圓滿(source = 'mic')
             x= self.框們 #.copy()
         else: #source == 'wav': # source= 'wav'
-            self.等待第一圈錄音圓滿_wav()
+            self.等待第一圈錄音圓滿(source = 'wav')
             x= self.wav框們 #.copy()
         
         x= b''.join(x) # 二進位數字串 b'...'
@@ -216,10 +223,10 @@ class RyMic:
         m= abs(x).mean()
         s= abs(x).std()
         
-          
+        '''  
         #
         # 把頻譜當作 機率分布，算 平均頻率
-        #
+        # 頻率K 平均頻率E(K) 平均平方頻率E(K^2)
         N= self.frame_size
         k= np.arange(N//2)
         
@@ -230,7 +237,6 @@ class RyMic:
             X= abs(X)
             X= X[0:N//2]
             
-            #防止X.sum()==0 但不知會不會影響其他地方
             if X.sum() == 0:
                 continue
             else:   
@@ -246,11 +252,11 @@ class RyMic:
         
         平均頻率 *= self.sample_rate/self.frame_size
         頻率std *= self.sample_rate/self.frame_size
-        
+        '''
         if source=='mic':
-            self.初框=    {'mean':m, 'std':s, 'fmean':平均頻率, 'fstd':頻率std}
+            self.初框=    {'mean':m, 'std':s}#, 'fmean':平均頻率, 'fstd':頻率std}
         else:  #source=='wav':
-            self.wav初框= {'mean':m, 'std':s, 'fmean':平均頻率, 'fstd':頻率std}
+            self.wav初框= {'mean':m, 'std':s}#, 'fmean':平均頻率, 'fstd':頻率std}
 
         
         #self.重新計算初框活著= False

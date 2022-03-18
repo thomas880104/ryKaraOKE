@@ -9,7 +9,7 @@
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QMainWindow, QWidget, QLabel, QLineEdit
+from PyQt5.QtWidgets import QMainWindow, QWidget, QLabel, QLineEdit, QFileDialog
 from PyQt5.QtWidgets import QPushButton,QGraphicsColorizeEffect
 from PyQt5.QtCore import QSize,QRect,QEventLoop
 from mytubespleeter import Downloading_music,myspleeterrun
@@ -25,7 +25,7 @@ class MainWindow(QMainWindow):
         
         self.setMinimumSize(QSize(465, 336))   
         self.setMaximumSize(QSize(465, 336))
-        self.setWindowTitle("YoutubeKaraOKE by 長庚大學第14組") 
+        self.setWindowTitle("YoutubeKaraOKE") 
 
         self.nameLabel = QLabel(self)
         self.nameLabel.setText('請輸入想下載的音樂連結:')
@@ -37,13 +37,13 @@ class MainWindow(QMainWindow):
         font.setWeight(75)
         self.nameLabel.setFont(font)
         
-        self.ErrorLabel = QLabel(self)
+        self.TextLabel = QLabel(self)
         
-        self.ErrorLabel.setGeometry(QRect(120, 230, 350, 41))
+        self.TextLabel.setGeometry(QRect(120, 230, 350, 41))
         font = QtGui.QFont()
         font.setFamily("微軟正黑體")
         font.setPointSize(12)
-        self.ErrorLabel.setFont(font)
+        self.TextLabel.setFont(font)
         
         
         self.inputlineEdit = QLineEdit(self)
@@ -60,46 +60,48 @@ class MainWindow(QMainWindow):
         pybutton.setObjectName("inputcheck")
 
         pybutton = QPushButton('offvocal', self)
-        pybutton.clicked.connect(self.clickMethod)
+        pybutton.clicked.connect(self.offvocal)
         pybutton.setGeometry(QRect(190, 200, 75, 23))
         pybutton.setObjectName("inputcheck")
         
-        pybutton = QPushButton('無網路狀態', self)
-        pybutton.clicked.connect(self.NoNetMethod)
+        pybutton = QPushButton('本地檔案', self)
+        pybutton.clicked.connect(self.localfile)
         pybutton.setGeometry(QRect(270, 200, 75, 23))
         pybutton.setObjectName("inputcheck")
         
         
     def undetectedURL(self):
-        self.ErrorLabel.setStyleSheet("color: red;")
-        self.ErrorLabel.setText('這個連結是無效的，請重新輸入')
+        self.TextLabel.setStyleSheet("color: red;")
+        self.TextLabel.setText('這個連結是無效的，請重新輸入')
 
     def onvocal(self):
         URL = self.inputlineEdit.text()
+        self.TextLabel.setStyleSheet("color: black;")
+        self.TextLabel.setText('請稍等...')
         try:
-            Downloading_music(URL)
-            self.ErrorLabel.setStyleSheet("color: black;")
-            self.ErrorLabel.setText('請稍等...')
-            myspleeterrun()
-            os.system("mv tmp.wav output/tmp/KaraOKE.wav")
+            
+            song_name = Downloading_music(URL)
+            myspleeterrun(song_name,mode = 'onvocal')
             self.allo = True
             self.close()
-        except:
+        except Exception as e:
+            print(e.args)
             self.undetectedURL()
 
-    def clickMethod(self):
+    def offvocal(self):
         URL = self.inputlineEdit.text()
+        self.TextLabel.setStyleSheet("color: black;")
+        self.TextLabel.setText('請稍等...')
         try:
-            Downloading_music(URL)
-            self.ErrorLabel.setStyleSheet("color: black;")
-            self.ErrorLabel.setText('請稍等...')
-            myspleeterrun()
+            song_name = Downloading_music(URL)
+            myspleeterrun(song_name)
             self.allo = True
             self.close()
-        except:
+        except Exception as e:
+            print(e.args)
             self.undetectedURL()
-    def NoNetMethod(self):
-        self.filename = self.inputlineEdit.text()
+    def localfile(self):
+        self.filename, _= QFileDialog.getOpenFileName(self, 'Open file', './NoNetSongs',"Songs (*.wav)")
         self.NoNet = True
         self.allo = True
         self.close()
