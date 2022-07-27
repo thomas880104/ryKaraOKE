@@ -311,7 +311,7 @@ class RyMic:
                         
                     elif ch==2:
                         #
-                        # 1 sterio ==> 2 mono , for short int
+                        # 1 stereo ==> 2 mono , for short int
                         #
                         nFrames= self.frame_size #4
                         x= z #f.readframes(nFrames)
@@ -326,7 +326,7 @@ class RyMic:
                     
                     elif ch==3:
                         #
-                        # 1 sterio ==> listening 
+                        # 1 stereo ==> listening 
                         # 1 mono ==> analysis and processing, teacher's voice
                         #
                         nFrames= self.frame_size #4

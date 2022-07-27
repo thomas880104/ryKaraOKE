@@ -9,10 +9,10 @@
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QMainWindow, QWidget, QLabel, QLineEdit, QFileDialog
+from PyQt5.QtWidgets import QMainWindow, QWidget, QLabel, QLineEdit, QFileDialog, QCheckBox
 from PyQt5.QtWidgets import QPushButton,QGraphicsColorizeEffect
 from PyQt5.QtCore import QSize,QRect,QEventLoop
-from mytubespleeter import Downloading_music,myspleeterrun
+from mytubespleeter import Downloading_music,myspleeterrun,localfile_spleeter
 import sys
 import os
 
@@ -22,6 +22,7 @@ class MainWindow(QMainWindow):
         
         self.allo = False
         self.NoNet = False
+        self.video = None
         
         self.setMinimumSize(QSize(465, 336))   
         self.setMaximumSize(QSize(465, 336))
@@ -69,40 +70,59 @@ class MainWindow(QMainWindow):
         pybutton.setGeometry(QRect(270, 200, 75, 23))
         pybutton.setObjectName("inputcheck")
         
+        self.checkbox = QCheckBox('背景播放影片', self)
+        self.checkbox.setGeometry(190, 260, 100, 23)
+
         
-    def undetectedURL(self):
+    def undetectedURL(self, error_code):
         self.TextLabel.setStyleSheet("color: red;")
-        self.TextLabel.setText('這個連結是無效的，請重新輸入')
+        self.TextLabel.setText(str(error_code))
 
     def onvocal(self):
         URL = self.inputlineEdit.text()
         self.TextLabel.setStyleSheet("color: black;")
         self.TextLabel.setText('請稍等...')
+        self.video = self.checkbox.isChecked()
         try:
-            
-            song_name = Downloading_music(URL)
+            self.mode = 'onvocal'
+            song_name = Downloading_music(URL,self.video)
             myspleeterrun(song_name,mode = 'onvocal')
             self.allo = True
+            self.filename = song_name
             self.close()
         except Exception as e:
             print(e.args)
-            self.undetectedURL()
+            self.undetectedURL(error_code = e.args)
 
     def offvocal(self):
         URL = self.inputlineEdit.text()
         self.TextLabel.setStyleSheet("color: black;")
         self.TextLabel.setText('請稍等...')
+        self.video = self.checkbox.isChecked()
         try:
-            song_name = Downloading_music(URL)
+            self.mode = 'offvocal'
+            song_name = Downloading_music(URL,self.video)
             myspleeterrun(song_name)
+            self.filename = song_name
             self.allo = True
             self.close()
         except Exception as e:
             print(e.args)
-            self.undetectedURL()
+            self.undetectedURL(error_code = e.args)
     def localfile(self):
-        self.filename, _= QFileDialog.getOpenFileName(self, 'Open file', './NoNetSongs',"Songs (*.wav)")
+        self.filename, _= QFileDialog.getOpenFileName(self, 'Open file', './localfile',"Songs (*.wav *.mp4)")
         self.NoNet = True
+
+        self.mode = 'onvocal'
+        if self.filename[-3:] == 'mp4':
+            self.video = True
+            self.filename = localfile_spleeter(self.filename)
+            self.NoNet = False
+
+        '''
+        elif self.filename[-3:] == 'wav':
+            myspleeterrun(self.filename)
+        '''
         self.allo = True
         self.close()
 
