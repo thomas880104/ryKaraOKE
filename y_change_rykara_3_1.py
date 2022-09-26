@@ -3,7 +3,7 @@
 ryKaraOkeInPygame.py
 
 2022/2/22
-已處理：get_wav_mic_array()分離, score_system()分離
+已處理：get_wav_mic_array()分離, freq_process()分離
 2022/2/23
 已處理：score system 問題：分數放入self, 分數一直閃爍, 分數計算方式
 2022/2/24
@@ -34,7 +34,13 @@ ryKaraOkeInPygame.py
 
 2022/7/13
 需要處理：wav_pitch_array list out of range
-
+2022/8/8
+已增加：目前時間 / 總時長
+2022/8/9
+已處理：畫面配合影片縮放
+2022/8/12
+已處理：調整變數名稱，畫面
+需處理：重寫output to screen部分
 '''
 
 import numpy        as np
@@ -70,7 +76,7 @@ def wav_pitch(wav):
 
     target = data[:,2]
     time = len(target)/sr
-    print(time)
+    
     hz = []
     for i in range(int(time)*10):
         pitch = freq_from_autocorr(target[i*1600:(i+1)*1600], sr)
@@ -164,11 +170,13 @@ class RySpectrogram:
         self.audio = audio
         self.video = video
 
-        self.audio_start_time = 0
-
-
         self.wav_pitch_array = pitch
 
+        self.audio_start_time = 0
+        self.audio_length = time.strftime('%M:%S', time.gmtime(len(self.wav_pitch_array)/10))
+
+        
+        
         self.score_times = 0
 
     def start(self):
@@ -234,17 +242,7 @@ class RySpectrogram:
                     else:
                         pass
 
-        def draw_pitch(x):
 
-            for n in range(len(self.fQ)):
-                x00= x+ (n-len(self.fQ)+4) *8 #*16 # 橫軸 放大 16 倍 #辨識的要設70才會一樣
-                y00= self.fQ[n][0]
-                    
-                x01= x+ (n-len(self.fQ)) *8 #不知為何它早出現約4框？只在前方4框先畫出
-                y01= self.fQ[n][1]
-                    
-                pg.draw.ellipse(self.screen, pg.Color('white'), [(x00, y00), (16, 16)],4)
-                pg.draw.ellipse(self.screen, pg.Color('yellow'), [(x01, y01), (12,12)],4)
 
         def get_wav_mic_array():
             '''
@@ -267,13 +265,13 @@ class RySpectrogram:
                 b0 += self.Mic.框們[k]
                 #b1 += self.Mic.wav框們[k]
 
-            self.mic_array= np.fromstring(b0,'int16')#x0
+            self.mic_array= np.frombuffer(b0,'int16')#x0
             #self.wav_array= np.fromstring(b1,'int16')#x1
             
 
-        def score_system():
+        def freq_process():
             '''
-            how this program get your score with your voice
+            get vocal and wav array data and turn into freq
             '''
             frame = pg.time.get_ticks() - self.audio_start_time
             if frame//100 == len(self.wav_pitch_array):
@@ -282,14 +280,11 @@ class RySpectrogram:
                 sys.exit()
 
             #
-            # 把 f0 放在這裡。
-            f0= freq_from_autocorr(self.mic_array, self.Mic.sample_rate)#.frame_size) #self.Mic.sample_rate)
-            #f1= freq_from_autocorr(self.wav_array, self.Mic.sample_rate)#.frame_size) #self.Mic.sample_rate)
-            f1 = self.wav_pitch_array[frame//100]
-
+            # 把 mic_freq 放在這裡。
+            mic_freq= freq_from_autocorr(self.mic_array, self.Mic.sample_rate)#.frame_size) #self.Mic.sample_rate)
             
+            wav_freq = self.wav_pitch_array[frame//100]
 
-            print(frame//100)
             en0= abs(self.mic_array).mean()
             #en1= abs(self.wav_array).mean()
                 
@@ -301,67 +296,89 @@ class RySpectrogram:
             if en1 > self.Mic.wav初框['mean'] + self.Mic.wav初框['std']*1: #原本為mean + std*3  
                 wav_not_noise= True
             '''
-            if mic_not_noise==False or f0 > 1000: #去掉雜音
-                f0=-20
+            if mic_not_noise==False or mic_freq > 1000: #去掉雜音
+                mic_freq=-20
 
-            if f1 > 1000: 
-                f1=-10 
+            if wav_freq > 1000: 
+                wav_freq=-10 
                 
                 
             #
             # 量化在半音內，觀看音符比較穩定。
             #
-            f0_Q, note0= pitchQuantization(f0)
-            f1_Q, note1= pitchQuantization(f1)
+            mic_freq_Q, note0= pitchQuantization(mic_freq)
+            wav_freq_Q, note1= pitchQuantization(wav_freq)
                 
             #
             # 簡單的評分，調整八度後，相差 5 hz 以內 就算正確。
             #
             pitchHit= False
-            if (abs(f1 - f0) <= 5 or abs(f1/2 - f0) <= 5):       
+            if (abs(wav_freq - mic_freq) <= 5 or abs(wav_freq/2 - mic_freq) <= 5):       
                 self.pitchMatching += 1
                 pitchHit= True
-            else: pass
                 
-            #pitchScore_y= (self.height - self.pitchMatching) % self.height - 20# for y axis
-            #pitchScore_x= ((self.pitchMatching // self.height + 1) * 16) % self.width # for x axis
-                
-            pg.draw.rect(self.screen, pg.Color('blue'),[(16, 467+20),(80,20)])
-            pg.draw.rect(self.screen, pg.Color('blue'),[(16, 467),(80,20)])
-            pg.draw.rect(self.screen, pg.Color('yellow'),[(16, 467-20),(80,20)])
-            pg.draw.line(self.screen, pg.Color('blue'),(0, self.height),(0, 467), 16*2)
+            pg.draw.rect(self.screen, pg.Color('blue'),[(2, self.height-20),(80,20)])
+            pg.draw.rect(self.screen, pg.Color('blue'),[(2, self.height-40),(80,20)])
+            pg.draw.rect(self.screen, pg.Color('yellow'),[(2, self.height-60),(80,20)])
+            pg.draw.rect(self.screen, pg.Color('blue'),[(self.width-140,self.height-20),(140,20)])
+            
                 
 
-            aMsg= '{}, {:.0f}'.format(note0, f0)
+            aMsg= '{}, {:.0f}'.format(note0, mic_freq)
             aText= aFont.render(aMsg, True, pg.Color('white'))
                 
-            bMsg= '{}, {:.0f}'.format(note1, f1)
+            bMsg= '{}, {:.0f}'.format(note1, wav_freq)
             bText= aFont.render(bMsg, True, pg.Color('yellow'))
                 
             cMsg= '{}'.format(self.pitchMatching)
             cText= aFont.render(cMsg, True, pg.Color('blue'))
-                
-            self.screen.blit(aText, (16, 467+20)) # 'while'
-            self.screen.blit(bText, (16, 467))    # 'yellow'
-            self.screen.blit(cText, (16, 467-20)) # 'blue'
-                
+
+            #length
+            current_time = time.strftime('%M:%S', time.gmtime(frame//1000))
+
+            dMsg= '{} / {}'.format(current_time,self.audio_length)
+            dText= aFont.render(dMsg, True, pg.Color('white'))  
+
+            self.screen.blit(aText, (2, self.height-20)) # 'while'
+            self.screen.blit(bText, (2, self.height-40))    # 'yellow'
+            self.screen.blit(cText, (2, self.height-60)) # 'blue'
+            self.screen.blit(dText, (self.width-140,self.height-20))    
                 
             #
-            # 永遠把 f0 限縮在 440 以內，以利畫圖於幕上
+            # 永遠把 mic_freq 限縮在 440 以內，以利畫圖於幕上
             #
-            while f0>440: f0=f0/2
-            while f1>440: f1=f1/2
+            while mic_freq > 440: mic_freq = mic_freq/2
+            while wav_freq > 440: wav_freq = wav_freq/2
 
             #將Voice跟Ans的frequency放入array(黃白圈圈)
-            f0_h= self.height - f0/440 * self.height
-            f1_h= self.height - f1/440 * self.height
-            self.fQ += [(f0_h, f1_h)] 
+            mic_freq_h= self.height - mic_freq/440 * self.height
+            wav_freq_h= self.height - wav_freq/440 * self.height
+            self.fQ += [(mic_freq_h, wav_freq_h)] 
                 
-            while len(self.fQ)>128: 
+            while len(self.fQ)>128: #128
                 self.fQ.popleft()     # 保持 16 框就好
         
-        
+        def draw_pitch(x):
+            '''
+            get freq data from freq_process() "self.fQ" and output to screen
+            ''' 
 
+            for n in range(len(self.fQ)):
+                mic_x_axis= x+ (n-len(self.fQ)+4) *8 #*16 # 橫軸 放大 16 倍 #辨識的要設70才會一樣
+                mic_y_axis= self.fQ[n][0]
+                    
+                wav_x_axis= x+ (n-len(self.fQ)) *8 #不知為何它早出現約4框？只在前方4框先畫出
+                wav_y_axis= self.fQ[n][1]
+                    
+                pg.draw.ellipse(self.screen, pg.Color('white'),  [(mic_x_axis, mic_y_axis), (16,16)],4)
+                pg.draw.ellipse(self.screen, pg.Color('yellow'), [(wav_x_axis, wav_y_axis), (12,12)],4)     
+            '''
+            for n in range(self.width/8):
+                wav_x_axis = n * 8
+                wav_y_axis = 
+
+                pg.draw.ellipse(self.screen, pg.Color('yellow'), [(wav_x_axis, wav_y_axis), (12,12)],4)
+            '''
         def color_line(x):
 
             for n in range(-36,1):
@@ -408,13 +425,13 @@ class RySpectrogram:
                     
                 
             
-            pg.draw.line(self.screen, pg.Color('gray'),(x,self.height),(x,0) , 10)
+            pg.draw.line(self.screen, pg.Color('gray'),(x,self.height),(x,0) , 5)
                 
             #
             # 把12平均律譜線在此跟江永進白線一起畫出。
             
             #color_line(x)     
-            score_system()
+            freq_process()
             draw_pitch(x)
 
             
@@ -450,6 +467,8 @@ class RySpectrogram:
             fps = video.get(cv2.CAP_PROP_FPS)
 
             self.screen = pg.display.set_mode(video_image.shape[1::-1])
+            self.width = pg.Surface.get_width(self.screen)
+            self.height = pg.Surface.get_height(self.screen)
             clock = pg.time.Clock()
 
             pg.mixer.music.play()
@@ -457,7 +476,9 @@ class RySpectrogram:
             run = success
             while run:
                 
+
                 clock.tick(fps)
+                #keyboard_event()
                 for event in pg.event.get():
                     if event.type == pg.QUIT:
                         run = False
@@ -485,6 +506,7 @@ class RySpectrogram:
             wavfile.write('output/tmp.wav', fs, audio)
 
             pg.mixer.music.load('output/tmp.wav')
+            
             if self.video == None:
                 pg.mixer.music.play()
                 self.audio_start_time = pg.time.get_ticks()
@@ -567,7 +589,7 @@ class RySpectrogram:
             pg.quit()
             self.Mic.stop()
             sys.exit()
-     
+            
                 
     
 
@@ -582,16 +604,16 @@ if __name__=='__main__':
             mic= RyMic(musicfile = mainWin.filename)
             mic.start(wav = False)
             
-            Spectrogram= RySpectrogram(mic, pitch = pitch, audio=mainWin.filename)
+            Spectrogram = RySpectrogram(mic, pitch = pitch, audio=mainWin.filename)
             Spectrogram.start()
         else:
             pitch = wav_pitch('localfile/' + mainWin.mode + '/' + mainWin.filename + '.wav')
             mic= RyMic(musicfile = 'localfile/' + mainWin.mode + '/' + mainWin.filename + '.wav')
             mic.start(wav = False)
             if mainWin.video == True:
-                Spectrogram= RySpectrogram(mic,video = 'localfile/mp4/' + mainWin.filename + '.mp4',pitch = pitch,audio='localfile/' + mainWin.mode + '/' + mainWin.filename + '.wav')
+                Spectrogram = RySpectrogram(mic,video = 'localfile/mp4/' + mainWin.filename + '.mp4',pitch = pitch,audio='localfile/' + mainWin.mode + '/' + mainWin.filename + '.wav')
             elif mainWin.video == False:
-                Spectrogram= RySpectrogram(mic,pitch = pitch,audio=mainWin.filename)
+                Spectrogram = RySpectrogram(mic,pitch = pitch,audio = mainWin.filename)
             Spectrogram.start()
     else:
         sys.exit()
