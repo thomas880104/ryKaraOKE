@@ -181,34 +181,10 @@ def freq_from_autocorr(sig, fs):
 
     # Find the first low point
     d = diff(corr)
-    #
-    #
-    #start = find(d > 0)[0]
-    #
-    # 萬一 find(d > 0) == np.array([]) ！ 上面這行就有 bug 了
-    #
-    # 例如：
-    #
-    '''
-    >>> sig= np.array([1,1,1,1,1,1,1,1,1])
-    >>> corr = fftconvolve(sig, sig[::-1], mode='full')
-    >>> corr = corr[len(corr)//2:]
-    >>> d = diff(corr)
-    >>> d>0
-    array([False, False, False, False, False, False, False, False], dtype=bool)
-    >>> find(d>0)
-    array([], dtype=int64)
-    >>> find(d>0)[0]
-    Traceback (most recent call last):
-      File "<pyshell#19>", line 1, in <module>
-        find(d>0)[0]
-    IndexError: index 0 is out of bounds for axis 0 with size 0
-    >>> 
-    '''
+
     try: 
         start = find(d > 0)[0]
     except:
-        #start= 0
         fs_px= 0
         return fs_px
     
@@ -222,21 +198,6 @@ def freq_from_autocorr(sig, fs):
 
     return fs / px
 
-'''
->>> Exception in thread Thread-4:
-Traceback (most recent call last):
-  File "C:\Python34\lib\threading.py", line 911, in _bootstrap_inner
-    self.run()
-  File "C:\Python34\lib\threading.py", line 859, in run
-    self._target(*self._args, **self._kwargs)
-  File "C:\Dropbox\ryASR\ryASR2016\ry重寫錄放音.py", line 348, in 鼠鍵線程
-    f0= freq_from_autocorr(x, 取樣率)
-  File "C:\Dropbox\ryASR\ryASR2016\ryF0Estimate000.py", line 137, in freq_from_autocorr
-    px, py = parabolic(corr, peak)
-  File "C:\Dropbox\ryASR\ryASR2016\ryF0Estimate000.py", line 46, in parabolic
-    xv = 1/2. * (f[x-1] - f[x+1]) / (f[x-1] - 2 * f[x] + f[x+1]) + x
-IndexError: index 1024 is out of bounds for axis 0 with size 1024
-'''
 
 def freq_from_HPS(sig, fs):
     """

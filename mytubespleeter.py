@@ -42,20 +42,24 @@ def Downloading_music(link,video):
             os.remove("output/tmp/vocals.wav")
         except:
             pass
+
     yt=YouTube(link)
+
     if video == True:
         t=yt.streams.get_highest_resolution()
         v = t
     elif video == False:
         t=yt.streams.filter(only_audio=True, file_extension='mp4')
         v = t[0]
+
     v.download(filename='tmp.mp4')
     name= v.title
     symbol = [':','/','\\']
     for s in symbol: 
         if name.find(s) >= 0:
             name = name.replace(s,' ')
-    print(name+'.mp4')
+
+    
     video = ffmpeg.input('./tmp.mp4')
     audio = video.audio
     stream = ffmpeg.output(audio, "tmp.wav")
@@ -66,7 +70,8 @@ def myspleeterrun(song_name = 'KaraOKE',mode = 'offvocal'):
     command_line = "spleeter separate -o output/ tmp.wav"
     args = shlex.split(command_line)
     p = subprocess.Popen(args)
-    p.wait()  
+    p.wait()
+
     if mode == 'offvocal':
         accompaniment_channel_1,accompaniment_channel_2 = Splitting_stereo_audio('output/tmp/accompaniment.wav')
     elif mode == 'onvocal':
@@ -78,7 +83,7 @@ def myspleeterrun(song_name = 'KaraOKE',mode = 'offvocal'):
     sound = sound.set_frame_rate(16000)
     sound.export("output/tmp/KaraOKE.wav",format="wav")
     shutil.copyfile('./output/tmp/KaraOKE.wav', './localfile/KaraOKE.wav')
-    print(song_name)
+    
     if mode == 'offvocal':
         shutil.move('./localfile/KaraOKE.wav', './localfile/offvocal/' + song_name + '.wav')
     elif mode == 'onvocal':

@@ -58,50 +58,42 @@ class RyMic:
                     )
         
         #主要　語音資料在此！！　將維持　.n_frame　個框
-        self.frame=  deque() #框們
-        self.frame_counter=   0      #i框  
+        self.frame_array=  deque() #[] # 據說用 deque 比用 list 快很多 leftpop() vs pop(0) ，練習看看。
+        self.frame_counter=   0        
         
-    
+        '''         
+        self.sec= sec #1
+        self.point= self.sec * self.point_per_sec
+        self.n_frame= self.point // self.frame_size 
+        '''
         self.n_frame= n_frame
         self.point= self.n_frame * self.frame_size
         self.sec= self.point / self.point_per_sec # sec非整數，在此預設值計算為 1.024
-        '''
-        self.框數= 框數
-        self.點數= self.框數 * self.frame_size
-        self.秒數= self.點數 / self.point_per_sec
-        '''
-
+        
         # 由於這裡會無條件捨去小數點，
         # 故實際sec會變小一點。 
         
 
         # 計算初始環境雜訊之資訊，可模仿之來撰寫其他演算法
-        self.first_frame= {'mean':0, 'std':1, 'fmean':0, 'fstd':1}#初框
+        self.first_frame= {'mean':0, 'std':1, 'fmean':0, 'fstd':1}
         
         #
         # 用多線程
         #
         self.record=  threading.Thread(target= self.record_thread )
         self.play=  threading.Thread(target= self.play_thread )       
-        self.first_thread=  threading.Thread(target= self.first_frame_thread)
-        self.wav_first_thread=  threading.Thread(target= self.first_frame_thread,kwargs={'source':'wav'})
-        '''
-        self.record=  threading.Thread(target= self.record_thread )
-        self.放音線=  threading.Thread(target= self.放音線程 )       
-        self.初框線=  threading.Thread(target= self.初框線程)
-        self.wav初框線=  threading.Thread(target= self.初框線程,kwargs={'source':'wav'})
-        '''
+        self.first_frame_thread=  threading.Thread(target= self.first_frame_thread)
+        self.wav_first_frame_thread=  threading.Thread(target= self.first_frame_thread,kwargs={'source':'wav'})
+        
         #
         # 加入 wav 檔 當作 麥 來用，可同時使用。
         #
         
         self.wav_record_and_play=  threading.Thread(target= self.wav_record_and_play_thread)
         
-        self.wav_sample_rate= self.wav_point_per_sec=  self.sample_rate #16000 # 10240 #10000
-        self.wav_frame_size=                self.frame_size #1024  # 1000
-        self.wav_byte_per_point=              self.byte_per_point=           2
+        self.byte_per_point = 2
         
-        self.wav_frame=  deque() #[]
+        self.wav_frame_array=  deque() #[]
         self.wav_frame_counter=   0        
         
         '''         
@@ -109,14 +101,11 @@ class RyMic:
         self.point= self.sec * self.point_per_sec
         self.n_frame= self.point // self.frame_size 
         '''
-        self.wav_n_frame= self.n_frame
-        self.wav_point= self.n_frame * self.frame_size
-        self.wav_sec= self.point / self.point_per_sec # sec非整數，在此預設值計算為 1.024
 
     def record_thread(self):
         '''
-        讀檔並以每個frame_size大小放入 frame 且 frame_counter++
-        frame為queue
+        讀檔並以每個frame_size大小放入 frame_array 且 frame_counter++
+        frame_array為queue
         '''
     
         # 最初 決定 n_frame= 10，frame_size= 1000， frame_size應小於 y.get_read_available()
@@ -128,19 +117,19 @@ class RyMic:
         print('record_thread()....')
         
         self.frame_counter= 0
-        self.frame=  deque() #[]
+        self.frame_array=  deque() #[]
         for i in range(self.n_frame):
             z= self.stream.read(self.frame_size) #, exception_on_overflow= False )
             
             #self.stream.write(z) ## 即時放音
             
-            self.frame += [z]
+            self.frame_array += [z]
             self.frame_counter  += 1
             
 
         #
         # 往後一直維持 相同n_frame(=10)，讀進 最新 @10 (末端)，丟棄 最舊 @0 (前端)
-        # frame[0 .. -1]
+        # frame_array[0 .. -1]
         #
         
  
@@ -149,20 +138,20 @@ class RyMic:
             
             z= self.stream.read(self.frame_size)
             
-            self.frame += [z]  # 新框加在尾端
+            self.frame_array += [z]  # 新框加在尾端
             self.frame_counter  += 1
             
-            self.frame.popleft()#pop(0)  # 舊框彈出
+            self.frame_array.popleft()#pop(0)  # 舊框彈出
         
-        # 如此，frame[:] ==frame[0,...,(N-1)] == frame[-N,...,-1]
+        # 如此，frame_array[:] ==frame_array[0,...,(N-1)] == frame_array[-N,...,-1]
 
     def frame_array_is_full(self, source = 'mic'):
         if source == 'mic':
-            while (len(self.frame) < self.n_frame): 
+            while (len(self.frame_array) < self.n_frame): 
                 time.sleep(.01)
             return True
         elif source == 'wav':
-            while (len(self.wav_frame) < self.wav_n_frame): 
+            while (len(self.wav_frame_array) < self.n_frame): 
                 time.sleep(.01)
             return True
         
@@ -173,7 +162,7 @@ class RyMic:
         
         self.play_thread_is_alive= True
         while self.play_thread_is_alive: #True:
-            z= self.frame[0] # [0..-1] # 錄音進 frame[-1] 之後，放音與其相距 (n_frame-1) 個框
+            z= self.frame_array[0] # [0..-1] # 錄音進 frame_array[-1] 之後，放音與其相距 (n_frame-1) 個框
             self.stream.write(z)
            
         '''
@@ -188,8 +177,8 @@ class RyMic:
         if record:   self.record.start()
         if play:   self.play.start()
         if first:   
-            self.first_thread.start()
-            self.wav_first_thread.start()
+            self.first_frame_thread.start()
+            self.wav_first_frame_thread.start()
             
         if wav:  self.wav_record_and_play.start()
 
@@ -218,10 +207,10 @@ class RyMic:
         
         if source == 'mic':
             self.frame_array_is_full(source = 'mic')
-            x= self.frame #.copy()
+            x= self.frame_array #.copy()
         else: #source == 'wav': # source= 'wav'
             self.frame_array_is_full(source = 'wav')
-            x= self.wav_frame #.copy()
+            x= self.wav_frame_array #.copy()
         
         x= b''.join(x) # 二進位數字串 b'...'
         x= np.fromstring(x, dtype= np.int16) # 須轉為 int
@@ -229,36 +218,7 @@ class RyMic:
         m= abs(x).mean()
         s= abs(x).std()
         
-        '''  
-        #
-        # 把頻譜當作 機率分布，算 平均頻率
-        # 頻率K 平均頻率E(K) 平均平方頻率E(K^2)
-        N= self.frame_size
-        k= np.arange(N//2)
-        
-        平均頻率=0
-        平均平方頻率=0
-        for i in range(self.n_frame):
-            X= np.fft.fft(x[(0+i*N):(N+i*N)])
-            X= abs(X)
-            X= X[0:N//2]
-            
-            if X.sum() == 0:
-                continue
-            else:   
-                平均頻率 += (k*X).sum()/X.sum() 
-                
-                平均平方頻率 += (k*k*X).sum()/X.sum() 
-        
-        平均頻率 /= self.n_frame
-        平均平方頻率 /= self.n_frame
-        
-        頻率var= 平均平方頻率-平均頻率**2
-        頻率std= 頻率var**.5
-        
-        平均頻率 *= self.sample_rate/self.frame_size
-        頻率std *= self.sample_rate/self.frame_size
-        '''
+     
         if source=='mic':
             self.first_frame=    {'mean':m, 'std':s}#, 'fmean':平均頻率, 'fstd':頻率std}
         else:  #source=='wav':
@@ -272,29 +232,29 @@ class RyMic:
         #重新計算first_frame活著= False
 
     def frame_array_is_full_wav(self):
-        while (len(self.wav_frame) < self.wav_n_frame): time.sleep(.01)
+        while (len(self.wav_frame_array) < self.n_frame): time.sleep(.01)
         return True
         
     def wav_record_and_play_thread(self):
         
         p= self.audio
-        musicfile = self.musicfile
+        wav_name = self.musicfile
         self.wav_record_thread_is_alive= True
         
         self.wav_frame_counter= 0 
-        self.wav_frame=  deque() #[]
+        self.wav_frame_array=  deque() #[]
         while self.wav_record_thread_is_alive:
         
-            self.musicfile = musicfile
+            self.wav_name = wav_name
             
             
-            with wave.open(musicfile,'rb') as f:
+            with wave.open(wav_name,'rb') as f:
                    
                 fm= p.get_format_from_width(f.getsampwidth())
                 ch= f.getnchannels()
-                self.wav_sample_rate= rt= f.getframerate()
+                self.sample_rate= rt= f.getframerate()
                 
-                print('musicfile={}, fm= {}, ch= {}, rt= {}'.format(musicfile, fm, ch, rt))
+                print('wav_name={}, fm= {}, ch= {}, rt= {}'.format(wav_name, fm, ch, rt))
 
                 self.w_stream= p.open(
                                 format=   fm,
@@ -317,7 +277,7 @@ class RyMic:
                         
                     elif ch==2:
                         #
-                        # 1 stereo ==> 2 mono , for short int
+                        # 1 sterio ==> 2 mono , for short int
                         #
                         nFrames= self.frame_size #4
                         x= z #f.readframes(nFrames)
@@ -332,7 +292,7 @@ class RyMic:
                     
                     elif ch==3:
                         #
-                        # 1 stereo ==> listening 
+                        # 1 sterio ==> listening 
                         # 1 mono ==> analysis and processing, teacher's voice
                         #
                         nFrames= self.frame_size #4
@@ -354,15 +314,15 @@ class RyMic:
                     
                     self.w_stream.write(z0)
                     
-                    self.wav_frame += [z1]  # 新框加在尾端
+                    self.wav_frame_array += [z1]  # 新框加在尾端
                     
                     self.wav_frame_counter  += 1
                     #self.wav_frame_counter= self.frame_counter #0 # 用 來同步
                     self.frame_counter=  self.wav_frame_counter
                     
                     
-                    while len(self.wav_frame) > self.wav_n_frame:
-                        self.wav_frame.popleft()#pop(0)  # 舊框彈出
+                    while len(self.wav_frame_array) > self.n_frame:
+                        self.wav_frame_array.popleft()#pop(0)  # 舊框彈出
                 self.wav_record_thread_is_alive= False
                 self.w_stream.stop_stream()
                 self.w_stream.close()

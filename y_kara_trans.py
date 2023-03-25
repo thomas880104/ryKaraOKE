@@ -30,7 +30,6 @@ ryKaraOkeInPygame.py
 需要處理：讀取wav檔的pitch會比音樂慢，撥放音樂的地方
 2022/6/7
 已處理：先讀取wav檔的pitch，黃圈對齊音樂，影片太慢
-需要處理：關閉程式
 
 2022/7/13
 需要處理：wav_pitch_array list out of range
@@ -40,7 +39,8 @@ ryKaraOkeInPygame.py
 已處理：畫面配合影片縮放
 2022/8/12
 已處理：調整變數名稱，畫面
-需處理：重寫output to screen部分
+2022/10/1
+已處理：code全英文
 '''
 
 import numpy        as np
@@ -58,8 +58,8 @@ from scipy.io import wavfile
 import evaluate
 from tensorflow.keras import models
 import tensorflow as tf
-
-from ryMic      import *
+import subprocess
+from ryMic_trans      import *
 from ryPitch__  import *
 from myspleeter_ui  import *
 
@@ -131,12 +131,12 @@ class RySpectrogram:
             self.Mic= Mic
         
         # for specgram, 頻譜， 調色盤，把 頻譜值 對應到顏色。
-        self.i譜框= 0
+        self.frame_counter= 0
         
-        self.譜框數= self.Mic.框數 * 16 
-        self.specgram= np.random.random([self.譜框數, self.Mic.frame_size//2])
+        self.n_frame= self.Mic.n_frame * 16 
+        self.specgram= np.random.random([self.n_frame, self.Mic.frame_size//2])
         
-        self.譜寬高= (self.譜框數, self.Mic.frame_size//2)    #specgram.shape
+        self.specgram_shape= (self.n_frame, self.Mic.frame_size//2)    #specgram.shape
 
         self.depth= 8 
         
@@ -150,12 +150,7 @@ class RySpectrogram:
         self.main_loop=  False
         
         self.spectrum_line= threading.Thread(target= self.Spectrum_thread)
-        
-        
-        self.時間點歌詞= dict()
-        self.時間點們= []
-        
-        #self.Mic.等待第一圈錄音圓滿_wav()
+
         
         self.keyboard = None
         self.mouse_is_click = False
@@ -174,14 +169,13 @@ class RySpectrogram:
 
         self.audio_start_time = 0
         self.audio_length = time.strftime('%M:%S', time.gmtime(len(self.wav_pitch_array)/10))
-
-        
+      
         
         self.score_times = 0
 
     def start(self):
             
-        self.spectrum_line.start() # 用 thread 執行時，關不掉！！(quit 不了)
+        self.spectrum_line.start() 
 
     def Spectrum_thread(self):
 
@@ -216,10 +210,10 @@ class RySpectrogram:
                         self.main_loop= False
 
                     elif e.key in [pg.K_a]:
-                        self.Mic.初框線程(source= 'wav')#會卡的原因，待解決
-                        self.Mic.初框線程(source= 'mic')#
-                        print('self.Mic.初框= {}'.format(self.Mic.初框))
-                        print('self.Mic.wav初框= {}'.format(self.Mic.wav初框))
+                        self.Mic.first_frame_thread(source= 'wav')#會卡的原因，待解決
+                        self.Mic.first_frame_thread(source= 'mic')#
+                        print('self.Mic.first_frame= {}'.format(self.Mic.first_frame))
+                        print('self.Mic.wav_first_frame= {}'.format(self.Mic.wav_first_frame))
 
                     else:
                         pass
@@ -249,24 +243,15 @@ class RySpectrogram:
             get wav array and mic array from mic.frames and mic.wavframes
             '''
 
-            #做成譜的音框數= 2
-            # 這是 mic
-            #b0= self.Mic.框們[-做成譜的音框數:]  
-            # 連取 2音框，做成1譜框，譜看起來會更平滑吧
-            #b0= b''.join(b0)
-                
-            #
-            # 但 .框們 現在是一個 deque, 不能 用 x1:x2
-            # 因此 簡單的改成如下
-            #
-            b0= b''
-            b1= b''
-            for k in range(-做成譜的音框數,0):
-                b0 += self.Mic.框們[k]
-                #b1 += self.Mic.wav框們[k]
+            #frame_for_spectrum= 2
 
+            b0= b''
+            
+            for k in range(-frame_for_spectrum,0):
+                b0 += self.Mic.frame_array[k]
+               
             self.mic_array= np.frombuffer(b0,'int16')#x0
-            #self.wav_array= np.fromstring(b1,'int16')#x1
+            
             
 
         def freq_process():
@@ -286,28 +271,21 @@ class RySpectrogram:
             wav_freq = self.wav_pitch_array[frame//100]
 
             en0= abs(self.mic_array).mean()
-            #en1= abs(self.wav_array).mean()
                 
             mic_not_noise= False
             wav_not_noise= False
-            if en0 > self.Mic.初框['mean']    + self.Mic.初框['std']*3:   
+            if en0 > self.Mic.first_frame['mean']    + self.Mic.first_frame['std']*3:   
                 mic_not_noise= True
-            '''
-            if en1 > self.Mic.wav初框['mean'] + self.Mic.wav初框['std']*1: #原本為mean + std*3  
-                wav_not_noise= True
-            '''
-            if mic_not_noise==False or mic_freq > 1000: #去掉雜音
-                mic_freq=-20
 
-            if wav_freq > 1000: 
-                wav_freq=-10 
+            if mic_not_noise==False or mic_freq > 2000: #去掉雜音
+                mic_freq=-20
                 
                 
             #
             # 量化在半音內，觀看音符比較穩定。
             #
-            mic_freq_Q, note0= pitchQuantization(mic_freq)
-            wav_freq_Q, note1= pitchQuantization(wav_freq)
+            _, note0= pitchQuantization(mic_freq)
+            _, note1= pitchQuantization(wav_freq)
                 
             #
             # 簡單的評分，調整八度後，相差 5 hz 以內 就算正確。
@@ -364,7 +342,7 @@ class RySpectrogram:
             ''' 
 
             for n in range(len(self.fQ)):
-                mic_x_axis= x+ (n-len(self.fQ)+4) *8 #*16 # 橫軸 放大 16 倍 #辨識的要設70才會一樣
+                mic_x_axis= x+ (n-len(self.fQ)) *8 #*16 # 橫軸 放大 16 倍 #辨識的要設70才會一樣
                 mic_y_axis= self.fQ[n][0]
                     
                 wav_x_axis= x+ (n-len(self.fQ)) *8 #不知為何它早出現約4框？只在前方4框先畫出
@@ -409,7 +387,7 @@ class RySpectrogram:
         
             get_wav_mic_array()
 
-            self.i譜框 += 1
+            self.frame_counter += 1
 
             if self.video == None:
                 aSurf= pg.transform.scale(self.bg, (self.width, self.height)) #//4))
@@ -419,9 +397,9 @@ class RySpectrogram:
             #
                 
             if self.keyboard != pg.K_e:
-                x= (self.i譜框 % self.譜框數)  * self.width / self.譜框數
+                x= (self.frame_counter % self.n_frame)  * self.width / self.n_frame
             else:
-                x= (self.譜框數-1)  * self.width / self.譜框數
+                x= (self.n_frame-1)  * self.width / self.n_frame
                     
                 
             
@@ -450,7 +428,7 @@ class RySpectrogram:
                 by Renyuan Lyu (呂仁園), Chang Gung Univ (長庚大學), TAIWAN, modified by YCH'''
             pg.display.set_caption(screen_title)
             
-            self.bg= pg.Surface(self.譜寬高, depth= self.depth) # for specgram
+            self.bg= pg.Surface(self.specgram_shape, depth= self.depth) # for specgram
 
             self.bg.set_palette(self.palette)
             #'''
@@ -459,18 +437,26 @@ class RySpectrogram:
         def background_video(mp4):
             '''
             play mp4 at background
-            need debug
+            
             '''
             
             video = cv2.VideoCapture(mp4)
             success, video_image = video.read()
+            if video_image.shape[1::-1][0] < 1280 or video_image.shape[1::-1][1] < 720:
+                if os.path.isfile(mp4[:-4]+'_resize.mp4'):
+                    os.remove(mp4[:-4]+'_resize.mp4')
+                subprocess.run('ffmpeg -i \"'+ mp4 + '\" -vf scale=1280:720 \"' + mp4[:-4]+'_resize.mp4\"')
+                mp4 = mp4[:-4]+'_resize.mp4'
+                video = cv2.VideoCapture(mp4)
+                success, video_image = video.read()
+            
             fps = video.get(cv2.CAP_PROP_FPS)
 
             self.screen = pg.display.set_mode(video_image.shape[1::-1])
-            self.width = pg.Surface.get_width(self.screen)
+            self.width = pg.Surface.get_width(self.screen) 
             self.height = pg.Surface.get_height(self.screen)
             clock = pg.time.Clock()
-
+            print(f'self.screen = {self.screen}')
             pg.mixer.music.play()
             self.audio_start_time = pg.time.get_ticks()
             run = success
@@ -496,7 +482,7 @@ class RySpectrogram:
                 
                 pg.display.flip()
 
-        def play_audio():
+        def audio_setting():
 
             fs, data = wavfile.read(self.audio)           
 
@@ -518,8 +504,8 @@ class RySpectrogram:
         import cv2
         import pygame as pg # 把 import pygame 放在線程之內，用線程跑時，pygame display 才會正常運作 (GUI部分)
         
-        做成譜的音框數= 2
-        ham= np.hamming(做成譜的音框數 * self.Mic.frame_size) #len(x))
+        frame_for_spectrum= 2
+        ham= np.hamming(frame_for_spectrum * self.Mic.frame_size) #len(x))
 
         pg.font.init()        
                 
@@ -540,17 +526,14 @@ class RySpectrogram:
         mouse_x_axis= mouse_y_axis=  0
         keyboard=          None
 
-        i框= self.Mic.wav_i框
         
-
-        #self.Mic.等待第一圈錄音圓滿(source='wav')
-        self.Mic.等待第一圈錄音圓滿(source='mic')
+        self.Mic.frame_array_is_full(source='mic')
         
         self.main_loop=  True
 
         print(len(self.wav_pitch_array))
         
-        play_audio()
+        audio_setting()
 
 
         while self.main_loop:
@@ -579,10 +562,6 @@ class RySpectrogram:
             # 畫面更新
             pg.display.flip()
         
-            
-            #while (self.Mic.wav_i框 - i框 == 0 ): pass # .wav_i框 會在 ryMic reset 成 0
-
-
 
 
         if self.main_loop == False:
